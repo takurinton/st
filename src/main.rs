@@ -38,15 +38,81 @@ async fn main() {
     }
 }
 
+// <script id="__NEXT_DATA__" type="application/json">、または <script src="/_next/static/..."> があるかどうかで判断
+// MEMO: SSG, SSR, app router, or CSR の区別はこれだけではできない
+async fn is_next_js(document: Document) -> Result<bool, reqwest::Error> {
+    if document
+        .find(Name("script"))
+        .any(|n| n.attr("id").unwrap_or("") == "__NEXT_DATA__")
+    {
+        return Ok(true);
+    }
+
+    if document
+        .find(Name("script"))
+        .any(|n| n.attr("src").unwrap_or("").starts_with("/_next/static"))
+    {
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+// fetch した JS のなかに `@license React` があるかどうかで判断
+async fn is_react(document: Document, url: &str) -> Result<bool, reqwest::Error> {
+    let mut js_urls = document
+        .find(Name("script"))
+        .filter_map(|n| n.attr("src"))
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+
+    for js_url in js_urls.iter_mut() {
+        if !js_url.starts_with("http") {
+            js_url.insert_str(0, url);
+        }
+    }
+
+    let mut react = false;
+    for js_url in js_urls {
+        let js = reqwest::get(&js_url).await?.text().await?;
+        if js.contains("@license React") {
+            react = true;
+            break;
+        }
+    }
+
+    Ok(react)
+}
+
+// <div id="___gatsby"> があるかどうかで判断
+async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
+    if document.find(Name("div")).any(|n| n.attr("id").unwrap_or("") == "___gatsby") {
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
 async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> {
     let resp = reqwest::get(url).await?.text().await?;
     let document = Document::from(resp.as_str());
 
     let mut technologies = HashSet::new();
 
-    if document.find(Name("script")).any(|n| n.attr("src").unwrap_or("").contains("next")) {
+    // Next.js
+    if is_next_js(document.clone()).await? {
         technologies.insert("Next.js".to_string());
     }
+
+    if is_react(document.clone(), url).await? {
+        technologies.insert("React".to_string());
+    }
+
+    // Gatsby
+    if is_gatsby(document.clone()).await? {
+        technologies.insert("Gatsby".to_string());
+    }
+
     // and more
 
     Ok(technologies)
