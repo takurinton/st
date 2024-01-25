@@ -93,6 +93,17 @@ async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
+async fn is_wordpress(document: Document) -> Result<bool, reqwest::Error> {
+    if document
+        .find(Name("meta"))
+        .any(|n| n.attr("name").unwrap_or("") == "generator")
+    {
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
 async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> {
     let resp = reqwest::get(url).await?.text().await?;
     let document = Document::from(resp.as_str());
@@ -111,6 +122,11 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
     // Gatsby
     if is_gatsby(document.clone()).await? {
         technologies.insert("Gatsby".to_string());
+    }
+
+    // WordPress
+    if is_wordpress(document.clone()).await? {
+        technologies.insert("WordPress".to_string());
     }
 
     // and more
