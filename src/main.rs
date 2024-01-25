@@ -59,6 +59,7 @@ async fn is_next_js(document: Document) -> Result<bool, reqwest::Error> {
 }
 
 // fetch した JS のなかに `@license React` があるかどうかで判断
+// TODO: Vue とマージしていい
 async fn is_react(document: Document, url: &str) -> Result<bool, reqwest::Error> {
     let mut js_urls = document
         .find(Name("script"))
@@ -104,6 +105,56 @@ async fn is_wordpress(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
+
+async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
+    if document.find(Name("div")).any(|n| n.attr("id").unwrap_or("") == "__nuxt") {
+        return Ok(true);
+    }
+
+    if document
+        .find(Name("script"))
+        .any(|n| n.attr("id").unwrap_or("") == "__NUXT_DATA__")
+    {
+        return Ok(true);
+    }
+
+    if document
+        .find(Name("script"))
+        .any(|n| n.attr("src").unwrap_or("").starts_with("/_nuxt/"))
+    {
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+// TODO: React とマージしていい
+async fn is_vue(document: Document, url: &str) -> Result<bool, reqwest::Error> {
+    let mut js_urls = document
+        .find(Name("script"))
+        .filter_map(|n| n.attr("src"))
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+
+    for js_url in js_urls.iter_mut() {
+        if !js_url.starts_with("http") {
+            js_url.insert_str(0, url);
+        }
+    }
+
+    let mut vue = false;
+    for js_url in js_urls {
+        let js = reqwest::get(&js_url).await?.text().await?;
+        if js.contains("@vue/") {
+            println!("found vue in {}", url);
+            vue = true;
+            break;
+        }
+    }
+
+    Ok(vue)
+}
+
 async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> {
     let resp = reqwest::get(url).await?.text().await?;
     let document = Document::from(resp.as_str());
@@ -127,6 +178,15 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
     // WordPress
     if is_wordpress(document.clone()).await? {
         technologies.insert("WordPress".to_string());
+    }
+
+    // Vue.js
+    if is_vue(document.clone(), url).await? {
+        technologies.insert("Vue.js".to_string());
+    }
+
+    if is_nuxt(document.clone()).await? {
+        technologies.insert("Nuxt.js".to_string());
     }
 
     // and more
