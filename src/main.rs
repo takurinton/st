@@ -129,6 +129,7 @@ async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
 }
 
 // TODO: React とマージしていい
+// 部分的に取れていないので後で修正します :pray:
 async fn is_vue(document: Document, url: &str) -> Result<bool, reqwest::Error> {
     let mut js_urls = document
         .find(Name("script"))
@@ -151,7 +152,6 @@ async fn is_vue(document: Document, url: &str) -> Result<bool, reqwest::Error> {
             break;
         }
         if js.contains("Vue.js v") {
-            println!("found vue in {}", url);
             vue = true;
             break;
         }
