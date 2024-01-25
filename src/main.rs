@@ -192,6 +192,7 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
         technologies.insert("Vue.js".to_string());
     }
 
+    // Nuxt
     if is_nuxt(document.clone()).await? {
         technologies.insert("Nuxt.js".to_string());
     }
