@@ -150,6 +150,11 @@ async fn is_vue(document: Document, url: &str) -> Result<bool, reqwest::Error> {
             vue = true;
             break;
         }
+        if js.contains("Vue.js v") {
+            println!("found vue in {}", url);
+            vue = true;
+            break;
+        }
     }
 
     Ok(vue)
@@ -160,6 +165,8 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
     let document = Document::from(resp.as_str());
 
     let mut technologies = HashSet::new();
+
+    println!("processing {}", url);
 
     // Next.js
     if is_next_js(document.clone()).await? {
