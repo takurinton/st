@@ -108,15 +108,32 @@ async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
-async fn is_wordpress(document: Document) -> Result<bool, reqwest::Error> {
-    if document
-        .find(Name("meta"))
-        .any(|n| n.attr("name").unwrap_or("") == "generator")
-    {
-        return Ok(true);
+// <meta name="generator" content="WordPress" /> だったら wordpress
+// <meta name="generator" content="Vitepress" /> だったら vitepress
+// <meta name="generator" content="VuePress" /> だったら vuepress
+// <meta name="generator" content="Hugo" /> だったら hugo
+async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
+    let d = document    .find(Name("meta"));
+    let mut technologies = HashSet::new();
+
+    for n in d {
+        if n.attr("name").unwrap_or("") == "generator" {
+            if n.attr("content").unwrap().contains("WordPress") {
+                technologies.insert("WordPress".to_string());
+            }
+            if n.attr("content").unwrap().contains("Vitepress") {
+                technologies.insert("Vitepress".to_string());
+            }
+            if n.attr("content").unwrap().contains("VuePress") {
+                technologies.insert("VuePress".to_string());
+            }
+            if n.attr("content").unwrap().contains("Hugo") {
+                technologies.insert("Hugo".to_string());
+            }
+        }
     }
 
-    Ok(false)
+    Ok(technologies)
 }
 
 
@@ -160,9 +177,10 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
         technologies.insert("Gatsby".to_string());
     }
 
-    // WordPress
-    if is_wordpress(document.clone()).await? {
-        technologies.insert("WordPress".to_string());
+    // ssg libs
+    let ssg_libs = is_ssg(document.clone()).await?;
+    for lib in ssg_libs {
+        technologies.insert(lib.to_string());
     }
 
 
