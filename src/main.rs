@@ -58,18 +58,11 @@ async fn is_next_js(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
-struct Libs {
-    react: bool,
-    vue: bool,
-}
 
 // fetch した JS のなかに `@license React` があるかどうかで判断
 // fetch した JS のなかに `@vue/` があるかどうかで判断
-async fn is_react_vue(document: Document, url: &str) -> Result<Libs, reqwest::Error> {
-    let mut libs = Libs {
-        react: false,
-        vue: false,
-    };
+async fn is_react_vue(document: Document, url: &str) -> Result<HashSet<String>, reqwest::Error> {
+    let mut libs = HashSet::new();
 
     let mut js_urls = document
         .find(Name("script"))
@@ -86,14 +79,12 @@ async fn is_react_vue(document: Document, url: &str) -> Result<Libs, reqwest::Er
     for js_url in js_urls {
         let js = reqwest::get(&js_url).await?.text().await?;
         if js.contains("@license React") {
-            libs.react = true;
+            libs.insert("React".to_string());
         }
-        if js.contains("@vue/") {
-            libs.vue = true;
+        if js.contains("@vue/") || js.contains("Vue.js v") {
+            libs.insert("Vue.js".to_string());
         }
-        if js.contains("Vue.js v") {
-            libs.vue = true;
-        }
+
     }
 
     Ok(libs)
@@ -192,11 +183,8 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
 
     // react or vue
     let libs = is_react_vue(document.clone(), url).await?;
-    if libs.react {
-        technologies.insert("React".to_string());
-    }
-    if libs.vue {
-        technologies.insert("Vue.js".to_string());
+    for lib in libs {
+        technologies.insert(lib);
     }
 
     // and more
