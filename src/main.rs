@@ -1,7 +1,7 @@
 use reqwest;
 use select::document::Document;
 use select::predicate::Name;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 fn get_urls() -> Vec<String> {
     // コマンドを実行するディレクトリからの相対パス
@@ -22,7 +22,7 @@ async fn main() {
     let mut results = HashMap::new();
 
     for url in urls {
-        match get_technologies(&url).await {
+        match st(&url).await {
             Ok(technologies) => {
                 results.insert(url.to_string(), technologies);
             }
@@ -58,6 +58,56 @@ async fn is_next_js(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
+#[tokio::test]
+async fn test_is_next_js() {
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script id="__NEXT_DATA__" type="application/json">
+    </script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_next_js(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script src="/_next/static/..."></script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_next_js(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script src="/_next/static/..."></script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_next_js(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_next_js(document).await.unwrap(), false);
+}
 
 // fetch した JS のなかに `@license React` があるかどうかで判断
 // fetch した JS のなかに `@vue/` があるかどうかで判断
@@ -84,19 +134,51 @@ async fn is_react_vue(document: Document, url: &str) -> Result<HashSet<String>, 
         if js.contains("@vue/") || js.contains("Vue.js v") {
             libs.insert("Vue.js".to_string());
         }
-
     }
 
     Ok(libs)
 }
 
+// リクエスト絡むのでテストはなし
+// #[tokio::test]
+// async fn test_is_react_vue() {}
+
 // <div id="___gatsby"> があるかどうかで判断
 async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
-    if document.find(Name("div")).any(|n| n.attr("id").unwrap_or("") == "___gatsby") {
+    if document
+        .find(Name("div"))
+        .any(|n| n.attr("id").unwrap_or("") == "___gatsby")
+    {
         return Ok(true);
     }
 
     Ok(false)
+}
+
+#[tokio::test]
+async fn test_is_gatsby() {
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <div id="___gatsby"></div>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_gatsby(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_gatsby(document).await.unwrap(), false);
 }
 
 // <meta name="generator" content="WordPress" /> だったら wordpress
@@ -105,7 +187,7 @@ async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
 // <meta name="generator" content="Hugo" /> だったら hugo
 // ...
 async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
-    let d = document    .find(Name("meta"));
+    let d = document.find(Name("meta"));
     let mut technologies = HashSet::new();
 
     for n in d {
@@ -128,9 +210,82 @@ async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
     Ok(technologies)
 }
 
+#[tokio::test]
+async fn test_is_ssg() {
+    let html = r#"
+    <html>
+    <head>
+    <meta name="generator" content="WordPress" />
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let mut technologies = HashSet::new();
+    technologies.insert("WordPress".to_string());
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+
+    let html = r#"
+    <html>
+    <head>
+    <meta name="generator" content="VitePress" />
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let mut technologies = HashSet::new();
+    technologies.insert("VitePress".to_string());
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+
+    let html = r#"
+    <html>
+    <head>
+    <meta name="generator" content="VuePress" />
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let mut technologies = HashSet::new();
+    technologies.insert("VuePress".to_string());
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+
+    let html = r#"
+    <html>
+    <head>
+    <meta name="generator" content="Hugo" />
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let mut technologies = HashSet::new();
+    technologies.insert("Hugo".to_string());
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let technologies = HashSet::new();
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+}
 
 async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
-    if document.find(Name("div")).any(|n| n.attr("id").unwrap_or("") == "__nuxt") {
+    if document
+        .find(Name("div"))
+        .any(|n| n.attr("id").unwrap_or("") == "__nuxt")
+    {
         return Ok(true);
     }
 
@@ -151,9 +306,67 @@ async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
-async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> {
+#[tokio::test]
+async fn test_is_nuxt() {
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <div id="__nuxt"></div>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_nuxt(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script id="__NUXT_DATA__" type="application/json">
+    </script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_nuxt(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script src="/_nuxt/..."></script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_nuxt(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_nuxt(document).await.unwrap(), false);
+}
+
+async fn st(url: &str) -> Result<HashSet<String>, reqwest::Error> {
     let resp = reqwest::get(url).await?.text().await?;
-    let document = Document::from(resp.as_str());
+    get_technologies(url, resp).await
+}
+
+async fn get_technologies(
+    url: &str,
+    html_string: String,
+) -> Result<HashSet<String>, reqwest::Error> {
+    let document = Document::from(html_string.as_str());
 
     let mut technologies = HashSet::new();
 
@@ -174,7 +387,6 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
     for lib in ssg_libs {
         technologies.insert(lib);
     }
-
 
     // Nuxt
     if is_nuxt(document.clone()).await? {
