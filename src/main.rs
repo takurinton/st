@@ -58,9 +58,12 @@ async fn is_next_js(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
+
 // fetch した JS のなかに `@license React` があるかどうかで判断
-// TODO: Vue とマージしていい
-async fn is_react(document: Document, url: &str) -> Result<bool, reqwest::Error> {
+// fetch した JS のなかに `@vue/` があるかどうかで判断
+async fn is_react_vue(document: Document, url: &str) -> Result<HashSet<String>, reqwest::Error> {
+    let mut libs = HashSet::new();
+
     let mut js_urls = document
         .find(Name("script"))
         .filter_map(|n| n.attr("src"))
@@ -73,16 +76,18 @@ async fn is_react(document: Document, url: &str) -> Result<bool, reqwest::Error>
         }
     }
 
-    let mut react = false;
     for js_url in js_urls {
         let js = reqwest::get(&js_url).await?.text().await?;
         if js.contains("@license React") {
-            react = true;
-            break;
+            libs.insert("React".to_string());
         }
+        if js.contains("@vue/") || js.contains("Vue.js v") {
+            libs.insert("Vue.js".to_string());
+        }
+
     }
 
-    Ok(react)
+    Ok(libs)
 }
 
 // <div id="___gatsby"> があるかどうかで判断
@@ -94,15 +99,33 @@ async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
-async fn is_wordpress(document: Document) -> Result<bool, reqwest::Error> {
-    if document
-        .find(Name("meta"))
-        .any(|n| n.attr("name").unwrap_or("") == "generator")
-    {
-        return Ok(true);
+// <meta name="generator" content="WordPress" /> だったら wordpress
+// <meta name="generator" content="Vitepress" /> だったら vitepress
+// <meta name="generator" content="VuePress" /> だったら vuepress
+// <meta name="generator" content="Hugo" /> だったら hugo
+// ...
+async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
+    let d = document    .find(Name("meta"));
+    let mut technologies = HashSet::new();
+
+    for n in d {
+        if n.attr("name").unwrap_or("") == "generator" {
+            if n.attr("content").unwrap().contains("WordPress") {
+                technologies.insert("WordPress".to_string());
+            }
+            if n.attr("content").unwrap().contains("VitePress") {
+                technologies.insert("VitePress".to_string());
+            }
+            if n.attr("content").unwrap().contains("VuePress") {
+                technologies.insert("VuePress".to_string());
+            }
+            if n.attr("content").unwrap().contains("Hugo") {
+                technologies.insert("Hugo".to_string());
+            }
+        }
     }
 
-    Ok(false)
+    Ok(technologies)
 }
 
 
@@ -128,38 +151,6 @@ async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
-// TODO: React とマージしていい
-// 部分的に取れていないので後で修正します :pray:
-async fn is_vue(document: Document, url: &str) -> Result<bool, reqwest::Error> {
-    let mut js_urls = document
-        .find(Name("script"))
-        .filter_map(|n| n.attr("src"))
-        .map(|s| s.to_string())
-        .collect::<Vec<String>>();
-
-    for js_url in js_urls.iter_mut() {
-        if !js_url.starts_with("http") {
-            js_url.insert_str(0, url);
-        }
-    }
-
-    let mut vue = false;
-    for js_url in js_urls {
-        let js = reqwest::get(&js_url).await?.text().await?;
-        if js.contains("@vue/") {
-            println!("found vue in {}", url);
-            vue = true;
-            break;
-        }
-        if js.contains("Vue.js v") {
-            vue = true;
-            break;
-        }
-    }
-
-    Ok(vue)
-}
-
 async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> {
     let resp = reqwest::get(url).await?.text().await?;
     let document = Document::from(resp.as_str());
@@ -173,28 +164,27 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
         technologies.insert("Next.js".to_string());
     }
 
-    if is_react(document.clone(), url).await? {
-        technologies.insert("React".to_string());
-    }
-
     // Gatsby
     if is_gatsby(document.clone()).await? {
         technologies.insert("Gatsby".to_string());
     }
 
-    // WordPress
-    if is_wordpress(document.clone()).await? {
-        technologies.insert("WordPress".to_string());
+    // ssg libs
+    let ssg_libs = is_ssg(document.clone()).await?;
+    for lib in ssg_libs {
+        technologies.insert(lib);
     }
 
-    // Vue.js
-    if is_vue(document.clone(), url).await? {
-        technologies.insert("Vue.js".to_string());
-    }
 
     // Nuxt
     if is_nuxt(document.clone()).await? {
         technologies.insert("Nuxt.js".to_string());
+    }
+
+    // react or vue
+    let libs = is_react_vue(document.clone(), url).await?;
+    for lib in libs {
+        technologies.insert(lib);
     }
 
     // and more
