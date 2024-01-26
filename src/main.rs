@@ -155,6 +155,32 @@ async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
+#[tokio::test]
+async fn test_is_gatsby() {
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <div id="___gatsby"></div>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_gatsby(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_gatsby(document).await.unwrap(), false);
+}
+
 // <meta name="generator" content="WordPress" /> だったら wordpress
 // <meta name="generator" content="Vitepress" /> だったら vitepress
 // <meta name="generator" content="VuePress" /> だったら vuepress
