@@ -58,6 +58,58 @@ async fn is_next_js(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
+#[tokio::test]
+async fn test_is_next_js() {
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script id="__NEXT_DATA__" type="application/json">
+    </script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_next_js(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script src="/_next/static/..."></script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_next_js(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script src="/_next/static/..."></script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_next_js(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_next_js(document).await.unwrap(), false);
+}
+
+
 
 // fetch した JS のなかに `@license React` があるかどうかで判断
 // fetch した JS のなかに `@vue/` があるかどうかで判断
