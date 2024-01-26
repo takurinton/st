@@ -142,6 +142,10 @@ async fn is_react_vue(document: Document, url: &str) -> Result<HashSet<String>, 
     Ok(libs)
 }
 
+// リクエスト絡むのでテストはなし
+// #[tokio::test]
+// async fn test_is_react_vue() {}
+
 // <div id="___gatsby"> があるかどうかで判断
 async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
     if document.find(Name("div")).any(|n| n.attr("id").unwrap_or("") == "___gatsby") {
