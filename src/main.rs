@@ -1,7 +1,7 @@
 use reqwest;
 use select::document::Document;
 use select::predicate::Name;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 fn get_urls() -> Vec<String> {
     // コマンドを実行するディレクトリからの相対パス
@@ -109,8 +109,6 @@ async fn test_is_next_js() {
     assert_eq!(is_next_js(document).await.unwrap(), false);
 }
 
-
-
 // fetch した JS のなかに `@license React` があるかどうかで判断
 // fetch した JS のなかに `@vue/` があるかどうかで判断
 async fn is_react_vue(document: Document, url: &str) -> Result<HashSet<String>, reqwest::Error> {
@@ -136,7 +134,6 @@ async fn is_react_vue(document: Document, url: &str) -> Result<HashSet<String>, 
         if js.contains("@vue/") || js.contains("Vue.js v") {
             libs.insert("Vue.js".to_string());
         }
-
     }
 
     Ok(libs)
@@ -148,7 +145,10 @@ async fn is_react_vue(document: Document, url: &str) -> Result<HashSet<String>, 
 
 // <div id="___gatsby"> があるかどうかで判断
 async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
-    if document.find(Name("div")).any(|n| n.attr("id").unwrap_or("") == "___gatsby") {
+    if document
+        .find(Name("div"))
+        .any(|n| n.attr("id").unwrap_or("") == "___gatsby")
+    {
         return Ok(true);
     }
 
@@ -187,7 +187,7 @@ async fn test_is_gatsby() {
 // <meta name="generator" content="Hugo" /> だったら hugo
 // ...
 async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
-    let d = document    .find(Name("meta"));
+    let d = document.find(Name("meta"));
     let mut technologies = HashSet::new();
 
     for n in d {
@@ -209,7 +209,6 @@ async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
 
     Ok(technologies)
 }
-
 
 #[tokio::test]
 async fn test_is_ssg() {
@@ -283,7 +282,10 @@ async fn test_is_ssg() {
 }
 
 async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
-    if document.find(Name("div")).any(|n| n.attr("id").unwrap_or("") == "__nuxt") {
+    if document
+        .find(Name("div"))
+        .any(|n| n.attr("id").unwrap_or("") == "__nuxt")
+    {
         return Ok(true);
     }
 
@@ -360,9 +362,10 @@ async fn st(url: &str) -> Result<HashSet<String>, reqwest::Error> {
     get_technologies(url, resp).await
 }
 
-
-
-async fn get_technologies(url: &str, html_string: String) -> Result<HashSet<String>, reqwest::Error> {
+async fn get_technologies(
+    url: &str,
+    html_string: String,
+) -> Result<HashSet<String>, reqwest::Error> {
     let document = Document::from(html_string.as_str());
 
     let mut technologies = HashSet::new();
@@ -385,7 +388,6 @@ async fn get_technologies(url: &str, html_string: String) -> Result<HashSet<Stri
         technologies.insert(lib);
     }
 
-
     // Nuxt
     if is_nuxt(document.clone()).await? {
         technologies.insert("Nuxt.js".to_string());
@@ -401,4 +403,3 @@ async fn get_technologies(url: &str, html_string: String) -> Result<HashSet<Stri
 
     Ok(technologies)
 }
-
