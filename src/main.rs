@@ -58,9 +58,19 @@ async fn is_next_js(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
+struct Libs {
+    react: bool,
+    vue: bool,
+}
+
 // fetch した JS のなかに `@license React` があるかどうかで判断
-// TODO: Vue とマージしていい
-async fn is_react(document: Document, url: &str) -> Result<bool, reqwest::Error> {
+// fetch した JS のなかに `@vue/` があるかどうかで判断
+async fn is_react_vue(document: Document, url: &str) -> Result<Libs, reqwest::Error> {
+    let mut libs = Libs {
+        react: false,
+        vue: false,
+    };
+
     let mut js_urls = document
         .find(Name("script"))
         .filter_map(|n| n.attr("src"))
@@ -73,16 +83,20 @@ async fn is_react(document: Document, url: &str) -> Result<bool, reqwest::Error>
         }
     }
 
-    let mut react = false;
     for js_url in js_urls {
         let js = reqwest::get(&js_url).await?.text().await?;
         if js.contains("@license React") {
-            react = true;
-            break;
+            println!("found react in {}", url);
+            libs.react = true;
+        } else if js.contains("@vue/") {
+            println!("found vue in {}", url);
+            libs.vue = true;
+        } else if js.contains("Vue.js v") {
+            libs.vue = true;
         }
     }
 
-    Ok(react)
+    Ok(libs)
 }
 
 // <div id="___gatsby"> があるかどうかで判断
@@ -128,38 +142,6 @@ async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
-// TODO: React とマージしていい
-// 部分的に取れていないので後で修正します :pray:
-async fn is_vue(document: Document, url: &str) -> Result<bool, reqwest::Error> {
-    let mut js_urls = document
-        .find(Name("script"))
-        .filter_map(|n| n.attr("src"))
-        .map(|s| s.to_string())
-        .collect::<Vec<String>>();
-
-    for js_url in js_urls.iter_mut() {
-        if !js_url.starts_with("http") {
-            js_url.insert_str(0, url);
-        }
-    }
-
-    let mut vue = false;
-    for js_url in js_urls {
-        let js = reqwest::get(&js_url).await?.text().await?;
-        if js.contains("@vue/") {
-            println!("found vue in {}", url);
-            vue = true;
-            break;
-        }
-        if js.contains("Vue.js v") {
-            vue = true;
-            break;
-        }
-    }
-
-    Ok(vue)
-}
-
 async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> {
     let resp = reqwest::get(url).await?.text().await?;
     let document = Document::from(resp.as_str());
@@ -173,10 +155,6 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
         technologies.insert("Next.js".to_string());
     }
 
-    if is_react(document.clone(), url).await? {
-        technologies.insert("React".to_string());
-    }
-
     // Gatsby
     if is_gatsby(document.clone()).await? {
         technologies.insert("Gatsby".to_string());
@@ -187,14 +165,19 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
         technologies.insert("WordPress".to_string());
     }
 
-    // Vue.js
-    if is_vue(document.clone(), url).await? {
-        technologies.insert("Vue.js".to_string());
-    }
 
     // Nuxt
     if is_nuxt(document.clone()).await? {
         technologies.insert("Nuxt.js".to_string());
+    }
+
+    // react or vue
+    let libs = is_react_vue(document.clone(), url).await?;
+    if libs.react {
+        technologies.insert("React".to_string());
+    }
+    if libs.vue {
+        technologies.insert("Vue.js".to_string());
     }
 
     // and more
