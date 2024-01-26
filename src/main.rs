@@ -278,10 +278,62 @@ async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
+#[tokio::test]
+async fn test_is_nuxt() {
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <div id="__nuxt"></div>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_nuxt(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script id="__NUXT_DATA__" type="application/json">
+    </script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_nuxt(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    <script src="/_nuxt/..."></script>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_nuxt(document).await.unwrap(), true);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    assert_eq!(is_nuxt(document).await.unwrap(), false);
+}
+
 async fn st(url: &str) -> Result<HashSet<String>, reqwest::Error> {
     let resp = reqwest::get(url).await?.text().await?;
     get_technologies(url, resp).await
 }
+
 
 
 async fn get_technologies(url: &str, html_string: String) -> Result<HashSet<String>, reqwest::Error> {
