@@ -113,7 +113,7 @@ async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
             if n.attr("content").unwrap().contains("WordPress") {
                 technologies.insert("WordPress".to_string());
             }
-            if n.attr("content").unwrap().contains("Vitepress") {
+            if n.attr("content").unwrap().contains("VitePress") {
                 technologies.insert("VitePress".to_string());
             }
             if n.attr("content").unwrap().contains("VuePress") {
