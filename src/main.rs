@@ -22,7 +22,7 @@ async fn main() {
     let mut results = HashMap::new();
 
     for url in urls {
-        match get_technologies(&url).await {
+        match st(&url).await {
             Ok(technologies) => {
                 results.insert(url.to_string(), technologies);
             }
@@ -151,9 +151,14 @@ async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
     Ok(false)
 }
 
-async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> {
+async fn st(url: &str) -> Result<HashSet<String>, reqwest::Error> {
     let resp = reqwest::get(url).await?.text().await?;
-    let document = Document::from(resp.as_str());
+    get_technologies(url, resp).await
+}
+
+
+async fn get_technologies(url: &str, html_string: String) -> Result<HashSet<String>, reqwest::Error> {
+    let document = Document::from(html_string.as_str());
 
     let mut technologies = HashSet::new();
 
@@ -191,3 +196,4 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
 
     Ok(technologies)
 }
+
