@@ -185,6 +185,77 @@ async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
 }
 
 
+#[tokio::test]
+async fn test_is_ssg() {
+    let html = r#"
+    <html>
+    <head>
+    <meta name="generator" content="WordPress" />
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let mut technologies = HashSet::new();
+    technologies.insert("WordPress".to_string());
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+
+    let html = r#"
+    <html>
+    <head>
+    <meta name="generator" content="VitePress" />
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let mut technologies = HashSet::new();
+    technologies.insert("VitePress".to_string());
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+
+    let html = r#"
+    <html>
+    <head>
+    <meta name="generator" content="VuePress" />
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let mut technologies = HashSet::new();
+    technologies.insert("VuePress".to_string());
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+
+    let html = r#"
+    <html>
+    <head>
+    <meta name="generator" content="Hugo" />
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let mut technologies = HashSet::new();
+    technologies.insert("Hugo".to_string());
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+
+    let html = r#"
+    <html>
+    <head>
+    </head>
+    <body>
+    </body>
+    </html>
+    "#;
+    let document = Document::from(html);
+    let technologies = HashSet::new();
+    assert_eq!(is_ssg(document).await.unwrap(), technologies);
+}
+
 async fn is_nuxt(document: Document) -> Result<bool, reqwest::Error> {
     if document.find(Name("div")).any(|n| n.attr("id").unwrap_or("") == "__nuxt") {
         return Ok(true);
