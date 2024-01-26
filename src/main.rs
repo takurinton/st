@@ -86,12 +86,12 @@ async fn is_react_vue(document: Document, url: &str) -> Result<Libs, reqwest::Er
     for js_url in js_urls {
         let js = reqwest::get(&js_url).await?.text().await?;
         if js.contains("@license React") {
-            println!("found react in {}", url);
             libs.react = true;
-        } else if js.contains("@vue/") {
-            println!("found vue in {}", url);
+        }
+        if js.contains("@vue/") {
             libs.vue = true;
-        } else if js.contains("Vue.js v") {
+        }
+        if js.contains("Vue.js v") {
             libs.vue = true;
         }
     }
@@ -112,6 +112,7 @@ async fn is_gatsby(document: Document) -> Result<bool, reqwest::Error> {
 // <meta name="generator" content="Vitepress" /> だったら vitepress
 // <meta name="generator" content="VuePress" /> だったら vuepress
 // <meta name="generator" content="Hugo" /> だったら hugo
+// ...
 async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
     let d = document    .find(Name("meta"));
     let mut technologies = HashSet::new();
@@ -122,7 +123,7 @@ async fn is_ssg(document: Document) -> Result<HashSet<String>, reqwest::Error> {
                 technologies.insert("WordPress".to_string());
             }
             if n.attr("content").unwrap().contains("Vitepress") {
-                technologies.insert("Vitepress".to_string());
+                technologies.insert("VitePress".to_string());
             }
             if n.attr("content").unwrap().contains("VuePress") {
                 technologies.insert("VuePress".to_string());
@@ -180,7 +181,7 @@ async fn get_technologies(url: &str) -> Result<HashSet<String>, reqwest::Error> 
     // ssg libs
     let ssg_libs = is_ssg(document.clone()).await?;
     for lib in ssg_libs {
-        technologies.insert(lib.to_string());
+        technologies.insert(lib);
     }
 
 
